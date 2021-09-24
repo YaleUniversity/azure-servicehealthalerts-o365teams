@@ -143,9 +143,15 @@ $messageCard.add("potentialAction",$potentialActions)
 # Now that we have the message card, convert it to JSON so it can be sent as the body of the outgoing webhook
 $messageCardJSON = $messageCard | ConvertTo-Json -Depth 15
 
-####### Now that the MessageCard is complete, send the outgoing webhook(s) to post the card
-invoke-webrequest -method POST -uri $env:webhookuri -body $messageCardJSON
+$webhooks = "${env:webhookuri}" | ConvertFrom-Json
+$webhookDictionary = @{}
+$webhooks | ForEach-Object { $webhookDictionary.Add($_.channel, $_.uri) }
 
+####### Now that the MessageCard is complete, send the outgoing webhook(s) to post the card
+foreach ($key in $webhookDictionary.Keys) {
+    Write-Host "Sending message card to ${key} channel."
+    invoke-webrequest -method POST -uri $webhookDictionary[$key] -body $messageCardJSON
+}
 
 # Associate values to output bindings by calling 'Push-OutputBinding'.
 Push-OutputBinding -Name Response -Value ([HttpResponseContext]@{
