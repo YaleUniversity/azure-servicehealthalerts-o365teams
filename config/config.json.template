@@ -1,0 +1,29 @@
+{
+    "Production": {
+        "subscriptions": [],
+        "webhookIntegrations": [
+            {
+                "channel":"{{ .productionTeamsChannelName }}",
+                "uri":"{{ .productionTeamsChannelUri }}"
+            }
+        ]
+    },
+    "Development": {
+        "subscriptions": [],
+        "webhookIntegrations": [
+            {
+                "channel":"{{ .developmentTeamsChannelName }}",
+                "uri":"{{ .developmentTeamsChannelUri }}"
+            }
+        ]
+    },
+    "Staging": {
+        "subscriptions": [],
+        "webhookIntegrations": [
+            {
+                "channel":"{{ .stagingTeamsChannelName }}",
+                "uri":"{{ .stagingTeamsChannelUri }}"
+            }
+        ]
+    }
+}
