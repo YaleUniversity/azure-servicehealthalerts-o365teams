@@ -31,6 +31,22 @@ $payload = ($request.rawbody | convertfrom-json)
 # Get the subscription ID that this alert is for from the payload
 $subscriptionId = $payload.data.essentials.alertid.split('/')[2] 
 
+# Connect to the storage account using MSI to load config.json
+$storageAccountName = (${env:AzureWebJobsStorage}).split('AccountName=')[1].split(';')[0]
+$storageContext = New-AzStorageContext -UseConnectedAccount -StorageAccountName $storageAccountName
+
+$configTempFile = New-TemporaryFile
+
+Get-AzStorageBlobContent -Context $storageContext -Blob "config.json" -Container data -Destination $configTempFile.FullName -Force
+
+$config = Get-Content -Encoding utf8 -Path $configTempFile | ConvertFrom-Json
+
+$subsDictionary = @{}
+$config.${env:AZURE_FUNCTIONS_ENVIRONMENT}.subscriptions | ForEach-Object {$subsDictionary.Add($_.Id, $_.Name)}
+
+Write-Host "Known subscriptions:"
+$subsDictionary
+
 # Start assembling the message card from the payload data
 
 # This script uses the legacy-but-simpler O365 "Message Card" format described at 
@@ -45,7 +61,7 @@ $sections = @() ; $SectionsHash = @{}
 $MessageCard.Add("@type", "MessageCard")
 $MessageCard.Add("@context", "http://schema.org/extensions")
 $MessageCard.Add("summary", $payload.data.alertcontext.properties.title)
-$MessageCard.Add("title", "Azure Service Health Alert")
+$MessageCard.Add("title", "Azure Service Health Alert$($subsDictionary[$subscriptionId] | % {if ($_.Length -gt 0) {' for ' + $_} else {''} })")
 $MessageCard.Add("text", ("**Subscription ID " + $subscriptionId + "**" ))
 
 # Set the theme color for the message card based on the event "stage"
@@ -143,9 +159,8 @@ $messageCard.add("potentialAction",$potentialActions)
 # Now that we have the message card, convert it to JSON so it can be sent as the body of the outgoing webhook
 $messageCardJSON = $messageCard | ConvertTo-Json -Depth 15
 
-$webhooks = "${env:webhookuri}" | ConvertFrom-Json
 $webhookDictionary = @{}
-$webhooks | ForEach-Object { $webhookDictionary.Add($_.channel, $_.uri) }
+$config.${env:AZURE_FUNCTIONS_ENVIRONMENT}.webhookIntegrations | ForEach-Object {$webhookDictionary.Add($_.channel, $_.uri)}
 
 ####### Now that the MessageCard is complete, send the outgoing webhook(s) to post the card
 foreach ($key in $webhookDictionary.Keys) {
